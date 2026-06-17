@@ -1,0 +1,207 @@
+//@version=5
+indicator("Advanced Multi-TF FVG My Me", overlay=true, max_boxes_count=500, max_labels_count=500)
+
+//━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// TIMEFRAME SETTINGS
+//━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+showChartTF = input.bool(true, "Timeframe 1: Chart")
+show3m      = input.bool(false, "Timeframe 2: 3 Minutes")
+show5m      = input.bool(false, "Timeframe 3: 5 Minutes")
+show15m     = input.bool(false, "Timeframe 4: 15 Minutes")
+show1H      = input.bool(false, "Timeframe 5: 1 Hour")
+
+//━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// FVG SETTINGS
+//━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+showFVG = true
+filledType      = input.string("Close", "Filled FVG Type", options=["Close", "Wick"])
+deleteAfterFill = input.bool(true, "Delete Boxes after fill?")
+extendBoxes     = input.bool(false, "Extend Boxes?")
+boxLength       = input.int(20, "Length of Boxes")
+maxTrackBars    = input.int(300, "Max bars back")
+
+//━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// LABEL SETTINGS
+//━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+showLabels = true
+
+tf1Bull = input.string("FVG", "TF1 Bull Label")
+tf1Bear = input.string("FVG", "TF1 Bear Label")
+
+tf2Bull = input.string("3m FVG", "TF2 Bull Label")
+tf2Bear = input.string("3m FVG", "TF2 Bear Label")
+
+tf3Bull = input.string("5m FVG", "TF3 Bull Label")
+tf3Bear = input.string("5m FVG", "TF3 Bear Label")
+
+tf4Bull = input.string("15m FVG", "TF4 Bull Label")
+tf4Bear = input.string("15m FVG", "TF4 Bear Label")
+
+tf5Bull = input.string("1h FVG", "TF5 Bull Label")
+tf5Bear = input.string("1h FVG", "TF5 Bear Label")
+
+//━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// COLORS
+//━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+bullBoxColor = input.color(color.new(#1de623, 90), "Bullish FVG")
+bearBoxColor = input.color(color.new(color.red, 90), "Bearish FVG")
+
+//━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// ARRAYS
+//━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+var box[] boxes = array.new_box()
+var label[] labels = array.new_label()
+var float[] tops = array.new_float()
+var float[] bottoms = array.new_float()
+var bool[] bullishArr = array.new_bool()
+
+//━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// DRAW FUNCTION
+//━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+drawZone(_left, _top, _bottom, _bull, _label)=>
+
+    bgcolor = _bull ? bullBoxColor : bearBoxColor
+
+    rightSide = extendBoxes ? bar_index + 500 : _left + boxLength
+
+    bx = box.new(
+         left = _left,
+         right = rightSide,
+         top = _top,
+         bottom = _bottom,
+         bgcolor = bgcolor,
+         border_color = na,
+         border_width = 0)
+
+    array.push(boxes, bx)
+    array.push(tops, _top)
+    array.push(bottoms, _bottom)
+    array.push(bullishArr, _bull)
+
+    // LABEL
+    if showLabels
+
+        midY = (_top + _bottom) / 2
+        labelX = rightSide - 1
+
+        lb = label.new(
+             x = labelX,
+             y = midY,
+             text = _label,
+             style = label.style_none,
+             textalign = text.align_right,
+             size = size.small,
+             textcolor = _bull ? color.rgb(17, 233, 128) : color.red)
+
+        array.push(labels, lb)
+
+//━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// CURRENT TF LIVE FVG
+//━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+bullFVG = low > high[2]
+bearFVG = high < low[2]
+
+if showChartTF and showFVG
+
+    if bullFVG
+        drawZone(
+             bar_index[2],
+             low,
+             high[2],
+             true,
+             tf1Bull)
+
+    if bearFVG
+        drawZone(
+             bar_index[2],
+             low[2],
+             high,
+             false,
+             tf1Bear)
+
+//━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// 3M DATA
+//━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+[b3Bull, b3Bear, h3_2, l3_2, h3_0, l3_0] =request.security(syminfo.tickerid,"3",[low > high[2] ? 1 : 0,high < low[2] ? 1 : 0,high[2],low[2],high,low],lookahead = barmerge.lookahead_off)
+
+new3m = ta.change(time("3")) != 0
+
+if show3m and showFVG and new3m
+    if b3Bull == 1
+        drawZone(bar_index, l3_0, h3_2, true, tf2Bull)
+
+    if b3Bear == 1
+        drawZone(bar_index, l3_2, h3_0, false, tf2Bear)
+
+
+//━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// 5min DATA
+//━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+[b5Bull, b5Bear, h5_2, l5_2, h5_0, l5_0] =request.security(syminfo.tickerid,"5",[low > high[2] ? 1 : 0,high < low[2] ? 1 : 0,high[2],low[2],high,low],lookahead = barmerge.lookahead_off)
+
+new5m = ta.change(time("5")) != 0
+
+if show5m and showFVG and new5m
+    if b5Bull == 1
+        drawZone(bar_index, l5_0, h5_2, true, tf3Bull)
+
+    if b5Bear == 1
+        drawZone(bar_index, l5_2, h5_0, false, tf3Bear)
+
+//━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// 15min  DATA
+//━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+[b15Bull, b15Bear, h15_2, l15_2, h15_0, l15_0] = request.security(syminfo.tickerid,"15",[low > high[2] ? 1 : 0,high < low[2] ? 1 : 0,high[2],low[2],high,low],lookahead = barmerge.lookahead_off)
+
+new15m = ta.change(time("15")) != 0
+
+if show15m and showFVG and new15m
+    if b15Bull == 1
+        drawZone(bar_index, l15_0, h15_2, true, tf4Bull)
+
+    if b15Bear == 1
+        drawZone(bar_index, l15_2, h15_0, false, tf4Bear)
+
+//━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// 1H DATA
+//━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+[b1HBull, b1HBear, h1H_2, l1H_2, h1H_0, l1H_0] =request.security(syminfo.tickerid,"60",[low > high[2] ? 1 : 0,high < low[2] ? 1 : 0,high[2],low[2],high,low],lookahead = barmerge.lookahead_off)
+
+new1H = ta.change(time("60")) != 0
+
+if show1H and showFVG and new1H
+    if b1HBull == 1
+        drawZone(bar_index, l1H_0, h1H_2, true, tf5Bull)
+
+    if b1HBear == 1
+        drawZone(bar_index, l1H_2, h1H_0, false, tf5Bear)
+
+//━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// DELETE FILLED BOXES
+//━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+if deleteAfterFill and array.size(boxes) > 0
+
+    for i = array.size(boxes) - 1 to 0
+
+        top_ = array.get(tops, i)
+        bot_ = array.get(bottoms, i)
+        bull_ = array.get(bullishArr, i)
+
+        filled = filledType == "Close" ?
+             (bull_ ? close <= bot_ : close >= top_) :
+             (bull_ ? low <= bot_ : high >= top_)
+
+        if filled
+
+            box.delete(array.get(boxes, i))
+
+            if array.size(labels) > i
+                label.delete(array.get(labels, i))
+
+            array.remove(boxes, i)
+            array.remove(tops, i)
+            array.remove(bottoms, i)
+            array.remove(bullishArr, i)
+
+            if array.size(labels) > i
+                array.remove(labels, i)
